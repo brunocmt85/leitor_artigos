@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Leitor de Artigos</title>
+<style>
+body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 20px; }
+h1 { text-align: center; color: #333; }
+.controls { text-align: center; margin-bottom: 20px; }
+.controls button { margin: 0 5px; padding: 8px 12px; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; color: white; }
+.controls .green-btn { background-color: green; }
+.controls .yellow-btn { background-color: goldenrod; }
+.controls .red-btn { background-color: crimson; }
+.controls .all-btn { background-color: gray; }
+.controls .clear-btn { background-color: darkred; }
+.container { display: block; margin-top: 20px; }
+.card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: background-color 0.3s ease; margin-bottom: 10px; }
+.title { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
+.title-pt { font-size: 14px; color: #777; font-style: italic; margin-bottom: 10px; margin-left: 10px; }
+.author { font-size: 14px; margin-bottom: 10px; color: #555; }
+.notes { width: 100%; height: 50px; margin-top: 10px; padding: 5px; }
+.abstract { font-size: 14px; display: none; margin-top: 10px; }
+.button { margin-top: 10px; background-color: #007BFF; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-size: 14px; }
+.button:hover { background-color: #0056b3; }
+.marker-buttons { margin-top: 10px; }
+.marker-buttons button { width: 20px; height: 20px; margin-right: 5px; border: none; border-radius: 50%; cursor: pointer; }
+.green { background-color: green; }
+.yellow { background-color: yellow; }
+.red { background-color: red; }
+</style>
+</head>
+<body>
+
+<h1>Leitor de Artigos</h1>
+<div class="controls">
+<input type="file" id="upload" accept=".csv" />
+<button class="green-btn" onclick="filterCards('lightgreen')">Ver Verdes</button>
+<button class="yellow-btn" onclick="filterCards('lightyellow')">Ver Amarelos</button>
+<button class="red-btn" onclick="filterCards('#f8d7da')">Ver Vermelhos</button>
+<button class="all-btn" onclick="filterCards('all')">Mostrar Todos</button>
+<button class="clear-btn" onclick="confirmClearAll()">Limpar Marcações</button>
+<div id="counter"></div>
+</div>
+
+<div class="container" id="articlesContainer"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+<script>
+document.getElementById('upload').addEventListener('change', function(event) {
+    const file = event.target.files[0];
+    Papa.parse(file, { header: true, dynamicTyping: true, complete: function(results) { displayArticles(results.data); } });
+});
+
+function toggleVisibility(button) {
+    const abstract = button.nextElementSibling;
+    if (abstract.style.display === 'block') {
+        abstract.style.display = 'none';
+        button.textContent = button.dataset.originalText;
+    } else {
+        abstract.style.display = 'block';
+        button.textContent = 'Esconder ' + button.dataset.originalText.slice(8);
+    }
+}
+
+function markCard(card, color) {
+    const id = card.getAttribute('data-id');
+    if (card.dataset.color === color) {
+        card.style.backgroundColor = 'white';
+        card.dataset.color = 'white';
+        localStorage.removeItem(id);
+    } else {
+        card.style.backgroundColor = color;
+        card.dataset.color = color;
+        localStorage.setItem(id, color);
+    }
+    updateCounter();
+}
+
+function saveNote(id, note) {
+    localStorage.setItem('note_' + id, note);
+}
+
+function filterCards(color) {
+    const cards = document.querySelectorAll('.card');
+    cards.forEach(card => {
+        if (color === 'all' || card.dataset.color === color) {
+            card.style.display = 'block';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+
+function updateCounter() {
+    const cards = document.querySelectorAll('.card');
+    let green = 0, yellow = 0, red = 0;
+    cards.forEach(card => {
+        if (card.dataset.color === 'lightgreen') green++;
+        if (card.dataset.color === 'lightyellow') yellow++;
+        if (card.dataset.color === '#f8d7da') red++;
+    });
+    document.getElementById('counter').innerText = `Verdes: ${green} | Amarelos: ${yellow} | Vermelhos: ${red}`;
+}
+
+function clearAll() {
+    localStorage.clear();
+    location.reload();
+}
+
+function confirmClearAll() {
+    if (confirm('Tem certeza que deseja limpar todas as marcações e anotações?')) {
+        clearAll();
+    }
+}
+
+function displayArticles(data) {
+    const container = document.getElementById('articlesContainer');
+    container.innerHTML = '';
+    data.forEach(article => {
+        if (article.title) {
+            const card = document.createElement('div');
+            card.className = 'card';
+            const id = article.title_pt || article.title;
+            card.setAttribute('data-id', id);
+            const savedColor = localStorage.getItem(id);
+            card.dataset.color = savedColor || 'white';
+            card.style.backgroundColor = savedColor || 'white';
+            const savedNote = localStorage.getItem('note_' + id) || '';
+            card.innerHTML = `
+                <div class="title">${article.title}</div>
+                ${article.title_pt ? `<div class="title-pt">${article.title_pt}</div>` : ''}
+                <div class="author">${article.author}</div>
+                <div class="marker-buttons">
+                    <button class="green" onclick="markCard(this.closest('.card'), 'lightgreen')"></button>
+                    <button class="yellow" onclick="markCard(this.closest('.card'), 'lightyellow')"></button>
+                    <button class="red" onclick="markCard(this.closest('.card'), '#f8d7da')"></button>
+                </div>
+                <textarea class="notes" placeholder="Anotações..." onchange="saveNote('${id}', this.value)">${savedNote}</textarea>
+                <button class="button" data-original-text="Mostrar Abstract Original" onclick="toggleVisibility(this)">Mostrar Abstract Original</button>
+                <div class="abstract">${article.abstract}</div>
+                ${article.abstract_pt ? `<button class="button" data-original-text="Mostrar Abstract Traduzido" onclick="toggleVisibility(this)">Mostrar Abstract Traduzido</button><div class="abstract">${article.abstract_pt}</div>` : ''}
+            `;
+            container.appendChild(card);
+        }
+    });
+    updateCounter();
+}
+</script>
+
+</body>
+</html>
